@@ -504,6 +504,23 @@
   .ep-title{display:block; font-family:var(--font-body); font-size:14.5px; font-weight:500; color:var(--ink);}
   .ep-meta{display:block; font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); margin-top:3px;}
 
+  .dict-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;}
+  .dict-slots{
+    display:flex; flex-wrap:wrap; gap:7px; margin:18px 0 4px;
+    font-family:var(--font-read); font-size:17px; line-height:1.6;
+  }
+  .dict-slots .slot{
+    padding:3px 9px; border-radius:var(--radius-sm);
+    background:var(--surface-soft); color:var(--ink-faint);
+    letter-spacing:.14em; border:1px solid var(--line);
+  }
+  .dict-slots .slot.filled{
+    background:var(--accent-soft); color:var(--ink);
+    border-color:var(--accent); letter-spacing:normal;
+  }
+  .dict-hintline{font-size:11.5px; color:var(--ink-faint); margin-top:7px;}
+  .word-chip.miss{background:var(--surface-soft); color:var(--ink-faint); border:1px dashed var(--line);}
+
   .dict-bar{height:3px; background:var(--line); border-radius:2px; overflow:hidden;}
   .dict-bar span{display:block; height:100%; background:var(--accent); transition:width .3s ease;}
   .tr-n{
@@ -771,7 +788,67 @@ const DATA = {
           title:"Новый год по-русски",
           duration:"5:38",
           audioSrc:"novyy-god.mp3",
-          sentences:[]
+          sentences:[
+            {text:"", start:0.00, end:3.62},
+            {text:"", start:4.01, end:13.82},
+            {text:"", start:14.12, end:17.40},
+            {text:"", start:17.78, end:20.53},
+            {text:"", start:20.96, end:28.40},
+            {text:"", start:29.09, end:32.80},
+            {text:"", start:33.05, end:36.86},
+            {text:"", start:37.12, end:40.42},
+            {text:"", start:44.23, end:46.66},
+            {text:"", start:48.27, end:51.01},
+            {text:"", start:52.53, end:56.27},
+            {text:"", start:56.83, end:59.69},
+            {text:"", start:60.48, end:66.59},
+            {text:"", start:68.14, end:70.46},
+            {text:"", start:70.90, end:74.30},
+            {text:"", start:74.89, end:78.43},
+            {text:"", start:78.94, end:81.89},
+            {text:"", start:82.26, end:90.46},
+            {text:"", start:90.85, end:98.36},
+            {text:"", start:98.83, end:105.17},
+            {text:"", start:105.58, end:113.74},
+            {text:"", start:114.21, end:120.98},
+            {text:"", start:121.25, end:124.31},
+            {text:"", start:124.62, end:129.66},
+            {text:"", start:129.92, end:134.18},
+            {text:"", start:134.53, end:147.34},
+            {text:"", start:147.66, end:149.58},
+            {text:"", start:149.97, end:156.21},
+            {text:"", start:156.56, end:163.47},
+            {text:"", start:164.18, end:170.82},
+            {text:"", start:171.20, end:173.27},
+            {text:"", start:173.66, end:177.81},
+            {text:"", start:178.24, end:181.09},
+            {text:"", start:181.41, end:187.85},
+            {text:"", start:188.28, end:190.88},
+            {text:"", start:191.30, end:196.71},
+            {text:"", start:197.13, end:207.84},
+            {text:"", start:208.19, end:216.79},
+            {text:"", start:217.20, end:222.09},
+            {text:"", start:222.53, end:228.09},
+            {text:"", start:228.49, end:231.74},
+            {text:"", start:232.19, end:240.81},
+            {text:"", start:241.20, end:244.60},
+            {text:"", start:244.88, end:247.13},
+            {text:"", start:247.36, end:252.94},
+            {text:"", start:253.17, end:257.76},
+            {text:"", start:258.12, end:262.58},
+            {text:"", start:262.93, end:265.42},
+            {text:"", start:265.86, end:269.56},
+            {text:"", start:269.87, end:276.03},
+            {text:"", start:276.55, end:278.92},
+            {text:"", start:279.53, end:289.18},
+            {text:"", start:289.69, end:294.23},
+            {text:"", start:294.48, end:298.59},
+            {text:"", start:298.99, end:306.00},
+            {text:"", start:306.35, end:310.92},
+            {text:"", start:311.33, end:321.82},
+            {text:"", start:322.11, end:335.10},
+            {text:"", start:335.54, end:337.41}
+          ]
         }
       ]
     }
@@ -1902,15 +1979,35 @@ function renderTypingActivity(el, coll){
 
 /* ===================== DICTATION ===================== */
 /* ===================== ДИКТАНТ (listening) =====================
-   Flow mirrors DailyDictation: series -> episode -> listen & type, one sentence
-   at a time, with a separate full-transcript tab.                              */
+   Modelled on DailyDictation's listen-and-type exercise:
+     series -> episode -> one sentence at a time.
+   Per sentence: the player is clamped to that sentence's segment, the learner
+   types what they hear, and the answer is checked word by word. Words not yet
+   typed correctly stay hidden as blanks, a hint reveals the next one, and a
+   correct answer auto-advances.                                              */
 let openSeriesId = null;
 let openEpisodeId = null;
 let dictSentIdx = 0;
-let dictTab = "type";   // "type" | "transcript"
+let dictTab = "type";        // "type" | "transcript"
+let dictRevealed = 0;         // words revealed by Hint on the current sentence
+let dictPlays = 0;            // replay counter for the current sentence
+let dictLoop = false;
+let dictResults = {};         // sentenceIndex -> "ok" | "hint" | "skip"
 
 function findSeries(id){ return DATA.listening.find(s => s.id === id) || null; }
 function findEpisode(series, id){ return series ? series.episodes.find(e => e.id === id) || null : null; }
+
+/* Timestamps are generated up front; a sentence becomes usable only once its
+   text is filled in, so an episode with blank text stays in free-listen mode. */
+function readySentences(ep){
+  return (ep.sentences || []).filter(s => s.text && s.text.trim());
+}
+
+/* strip punctuation/case so "Привет!" and "привет" compare equal */
+function dictNorm(w){
+  return w.toLowerCase().replace(/ё/g,"е").replace(/[.,!?;:"«»()\u2014\u2013-]/g,"").trim();
+}
+function dictWords(text){ return text.trim().split(/\s+/).filter(Boolean); }
 
 function renderDictation(){
   const el = document.getElementById("view-dictation");
@@ -1930,11 +2027,11 @@ function renderSeriesList(el){
   el.innerHTML = `
     <div class="section-title"><h2>Диктант</h2><span>${DATA.listening.length} ta bo'lim</span></div>
     <div class="panel" style="margin-bottom:22px;">
-      <h4 style="font-family:var(--font-display); font-size:16px; margin-bottom:12px;">Diktant qanday ishlaydi</h4>
+      <h4 style="font-family:var(--font-display); font-size:16px; margin-bottom:14px;">Diktant qanday ishlaydi</h4>
       <div class="steps-grid">
-        <div class="step-item"><span class="step-n">1</span><div><b>Tinglang</b><p>Jumlani bir necha marta eshiting.</p></div></div>
-        <div class="step-item"><span class="step-n">2</span><div><b>Yozing</b><p>Eshitganingizni aynan yozing.</p></div></div>
-        <div class="step-item"><span class="step-n">3</span><div><b>Tekshiring</b><p>Xatolaringizni ko'rib chiqing.</p></div></div>
+        <div class="step-item"><span class="step-n">1</span><div><b>Tinglang</b><p>Har bir jumla alohida chalinadi.</p></div></div>
+        <div class="step-item"><span class="step-n">2</span><div><b>Yozing</b><p>Eshitganingizni so'zma-so'z yozing.</p></div></div>
+        <div class="step-item"><span class="step-n">3</span><div><b>Tekshiring</b><p>Xato so'zlar darhol ko'rsatiladi.</p></div></div>
         <div class="step-item"><span class="step-n">4</span><div><b>Ovoz chiqarib o'qing</b><p>Talaffuzni mustahkamlaydi.</p></div></div>
       </div>
     </div>
@@ -1971,13 +2068,13 @@ function renderEpisodeList(el){
     <div class="ep-list">
       ${sr.episodes.map((e,i)=>{
         const done = state.dictationDone.includes(e.id);
-        const ready = e.sentences && e.sentences.length;
+        const ready = readySentences(e).length;
         return `
         <button class="ep-row" data-ep="${e.id}">
           <span class="ep-num">${i+1}</span>
           <span class="ep-main">
             <span class="ep-title">${e.title}</span>
-            <span class="ep-meta">${e.duration ? e.duration+" · " : ""}${ready ? e.sentences.length+" ta jumla" : "matn tayyorlanmoqda"}</span>
+            <span class="ep-meta">${e.duration ? e.duration+" · " : ""}${ready ? ready+" ta jumla" : "matn tayyorlanmoqda"}</span>
           </span>
           ${done ? '<span class="badge badge-done">✓</span>' : ""}
         </button>`;
@@ -1985,19 +2082,22 @@ function renderEpisodeList(el){
     </div>`;
   document.getElementById("srBack").addEventListener("click", ()=>{ openSeriesId=null; renderDictation(); });
   el.querySelectorAll(".ep-row").forEach(r=>{
-    r.addEventListener("click", ()=>{ openEpisodeId=r.dataset.ep; dictSentIdx=0; dictTab="type"; renderDictation(); });
+    r.addEventListener("click", ()=>{
+      openEpisodeId=r.dataset.ep; dictSentIdx=0; dictTab="type";
+      dictRevealed=0; dictPlays=0; dictResults={}; renderDictation();
+    });
   });
 }
 
-/* ---------- one episode: listen & type ---------- */
+/* ---------- one episode ---------- */
 function renderEpisode(el){
   const sr = findSeries(openSeriesId);
   const ep = findEpisode(sr, openEpisodeId);
   if(!ep){ openEpisodeId=null; renderDictation(); return; }
-  const sents = ep.sentences || [];
-  const idx = sents.length ? Math.min(dictSentIdx, sents.length-1) : 0;
+  const sents = readySentences(ep);
   const epIdx = sr.episodes.findIndex(e=>e.id===ep.id);
   const nextEp = sr.episodes[epIdx+1];
+  const finished = sents.length && dictSentIdx >= sents.length;
 
   el.innerHTML = `
     <button class="btn btn-ghost btn-sm" id="epBack" style="margin-bottom:16px;">← ${sr.title}</button>
@@ -2006,13 +2106,13 @@ function renderEpisode(el){
       <span>${sr.levelRange || ""}${ep.duration ? " · "+ep.duration : ""}</span>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="playerPanel">
       <audio id="lisAudio" controls preload="metadata" src="${ep.audioSrc}" style="width:100%;"></audio>
       <div class="speed-row">
         <span class="act-meta">Tezlik:</span>
-        <button class="btn btn-ghost btn-sm speedBtn" data-rate="0.75">0.75x</button>
+        <button class="btn btn-ghost btn-sm speedBtn" data-rate="0.6">0.6x</button>
+        <button class="btn btn-ghost btn-sm speedBtn" data-rate="0.8">0.8x</button>
         <button class="btn btn-ghost btn-sm speedBtn btn-primary" data-rate="1">1x</button>
-        <button class="btn btn-ghost btn-sm speedBtn" data-rate="1.25">1.25x</button>
       </div>
     </div>
 
@@ -2020,7 +2120,6 @@ function renderEpisode(el){
       <div class="panel">
         <p style="color:var(--ink-soft); line-height:1.6;">
           Bu dars uchun matn hali kiritilmagan — hozircha erkin tinglash uchun.
-          Matn qo'shilgach, jumla-jumla yozib mashq qilish ochiladi.
         </p>
       </div>` : `
       <div class="act-switch" id="dictTabs" style="margin-bottom:0;">
@@ -2028,24 +2127,12 @@ function renderEpisode(el){
         <button class="${dictTab==="transcript"?"active":""}" data-tab="transcript">Полный текст</button>
       </div>
       <div class="panel" style="border-top-left-radius:0; border-top-right-radius:0;">
-        ${dictTab === "type" ? `
-          <div class="act-meta" style="margin-bottom:14px;">Jumla ${idx+1} / ${sents.length}</div>
-          <div class="dict-bar"><span style="width:${Math.round((idx)/sents.length*100)}%"></span></div>
-          <div class="shadow-actions" style="margin:16px 0;">
-            <button class="btn btn-ghost btn-sm" id="playSent">▶ Jumlani tinglash</button>
-            <button class="btn btn-ghost btn-sm" id="replaySent">↻ Qayta</button>
-          </div>
-          <input type="text" id="dictIn" placeholder="Eshitganingizni yozing..." autocomplete="off" spellcheck="false"/>
-          <div class="shadow-actions" style="margin-top:12px;">
-            <button class="btn btn-primary btn-sm" id="dictCheck">Tekshirish</button>
-            <button class="btn btn-ghost btn-sm" id="dictSkip">O'tkazib yuborish</button>
-          </div>
-          <div class="feedback-slot" id="dictSlot"></div>
-        ` : `
-          <div style="font-family:var(--font-read); font-size:16px; line-height:1.85;">
-            ${sents.map((x,i)=>`<p style="margin-bottom:10px;"><span class="tr-n">${i+1}</span>${x.text}</p>`).join("")}
-          </div>
-        `}
+        ${dictTab === "transcript"
+          ? `<div style="font-family:var(--font-read); font-size:16px; line-height:1.85;">
+               ${sents.map((x,i)=>`<p style="margin-bottom:10px;"><span class="tr-n">${i+1}</span>${x.text}</p>`).join("")}
+             </div>`
+          : finished ? renderDictResults(sents)
+                     : renderDictSentence(sents)}
       </div>`}
 
     ${nextEp ? `<div class="read-nav"><span></span><button class="btn btn-ghost btn-sm" id="nextEp">${nextEp.title} →</button></div>` : ""}`;
@@ -2064,60 +2151,180 @@ function renderEpisode(el){
     b.addEventListener("click", ()=>{ dictTab=b.dataset.tab; renderDictation(); });
   });
   if(nextEp) document.getElementById("nextEp").addEventListener("click", ()=>{
-    openEpisodeId=nextEp.id; dictSentIdx=0; dictTab="type"; renderDictation();
+    openEpisodeId=nextEp.id; dictSentIdx=0; dictTab="type";
+    dictRevealed=0; dictPlays=0; dictResults={}; renderDictation();
   });
 
-  if(sents.length === 0 || dictTab !== "type") return;
+  if(!sents.length || dictTab !== "type") return;
+  if(finished){ wireDictResults(el, ep, sents); return; }
+  wireDictSentence(el, ep, sents, audio);
+}
 
-  // play only the current sentence, stopping at its end
+/* ---------- the exercise itself ---------- */
+function renderDictSentence(sents){
+  const idx = dictSentIdx;
+  const words = dictWords(sents[idx].text);
+  const pct = Math.round(idx / sents.length * 100);
+  return `
+    <div class="dict-head">
+      <span class="act-meta">Jumla ${idx+1} / ${sents.length}</span>
+      <span class="act-meta" id="playCount">${dictPlays ? dictPlays+" marta tinglandi" : ""}</span>
+    </div>
+    <div class="dict-bar"><span style="width:${pct}%"></span></div>
+
+    <div class="dict-slots" id="dictSlots">
+      ${words.map((w,i)=> i < dictRevealed
+        ? `<span class="slot filled">${w}</span>`
+        : `<span class="slot">${"·".repeat(Math.max(2, dictNorm(w).length))}</span>`).join("")}
+    </div>
+
+    <div class="shadow-actions" style="margin:16px 0 14px;">
+      <button class="btn btn-primary btn-sm" id="playSent">▶ Tinglash</button>
+      <button class="btn btn-ghost btn-sm" id="loopBtn">${dictLoop ? "↻ Takror: yoniq" : "↻ Takror: o'chiq"}</button>
+      <button class="btn btn-ghost btn-sm" id="hintBtn">💡 Yordam</button>
+    </div>
+
+    <input type="text" id="dictIn" placeholder="Eshitganingizni yozing..." autocomplete="off" spellcheck="false"/>
+    <div class="dict-hintline">Enter — tekshirish · so'zlarni bo'sh joy bilan ajrating</div>
+
+    <div class="shadow-actions" style="margin-top:12px;">
+      <button class="btn btn-primary btn-sm" id="dictCheck">Tekshirish</button>
+      <button class="btn btn-ghost btn-sm" id="dictSkip">Javobni ko'rsatish</button>
+    </div>
+    <div class="feedback-slot" id="dictSlot"></div>`;
+}
+
+function wireDictSentence(el, ep, sents, audio){
+  const idx = dictSentIdx;
+  const sent = sents[idx];
+  const target = dictWords(sent.text);
   let segEnd = null;
-  if(audio){
-    audio.addEventListener("timeupdate", ()=>{
-      if(segEnd !== null && audio.currentTime >= segEnd){ audio.pause(); segEnd = null; }
-    });
-  }
-  function playCurrent(){
+
+  function playSegment(){
     if(!audio) return;
-    const s = sents[idx];
-    if(typeof s.start === "number"){
-      audio.currentTime = s.start;
-      segEnd = (typeof s.end === "number") ? s.end : null;
+    if(typeof sent.start === "number"){
+      audio.currentTime = sent.start;
+      segEnd = (typeof sent.end === "number") ? sent.end : null;
     }
     audio.play();
+    dictPlays++;
+    const pc = document.getElementById("playCount");
+    if(pc) pc.textContent = dictPlays + " marta tinglandi";
   }
-  document.getElementById("playSent").addEventListener("click", playCurrent);
-  document.getElementById("replaySent").addEventListener("click", playCurrent);
+  if(audio && !audio.dataset.segWired){
+    audio.dataset.segWired = "1";
+    audio.addEventListener("timeupdate", ()=>{
+      if(segEnd === null) return;
+      if(audio.currentTime >= segEnd){
+        if(dictLoop && typeof sent.start === "number"){ audio.currentTime = sent.start; }
+        else { audio.pause(); segEnd = null; }
+      }
+    });
+  }
+  // start the sentence automatically, the way DailyDictation does
+  if(audio) setTimeout(()=>{ playSegment(); }, 120);
+
+  document.getElementById("playSent").addEventListener("click", playSegment);
+  document.getElementById("loopBtn").addEventListener("click", ()=>{
+    dictLoop = !dictLoop;
+    document.getElementById("loopBtn").textContent = dictLoop ? "↻ Takror: yoniq" : "↻ Takror: o'chiq";
+  });
 
   const input = document.getElementById("dictIn");
-  input.focus();
   const slot = document.getElementById("dictSlot");
+  input.focus();
 
-  function advance(){
-    if(idx + 1 < sents.length){ dictSentIdx = idx + 1; renderDictation(); }
-    else {
-      if(!state.dictationDone.includes(ep.id)){ state.dictationDone.push(ep.id); logActivity(8); saveState(); }
-      slot.innerHTML = `<div class="feedback good">🎉 Dars tugadi! Barcha jumlalar yozildi.</div>`;
-    }
+  function paintSlots(correctCount){
+    const box = document.getElementById("dictSlots");
+    box.innerHTML = target.map((w,i)=> i < Math.max(dictRevealed, correctCount)
+      ? `<span class="slot filled">${w}</span>`
+      : `<span class="slot">${"·".repeat(Math.max(2, dictNorm(w).length))}</span>`).join("");
   }
+
+  document.getElementById("hintBtn").addEventListener("click", ()=>{
+    if(dictRevealed < target.length){
+      dictRevealed++;
+      dictResults[idx] = dictResults[idx] === "ok" ? "ok" : "hint";
+      paintSlots(0);
+    }
+  });
+
+  function advance(mark){
+    dictResults[idx] = dictResults[idx] || mark;
+    dictSentIdx = idx + 1;
+    dictRevealed = 0; dictPlays = 0;
+    renderDictation();
+  }
+
   function check(){
     if(slot.dataset.done) return;
-    const target = sents[idx].text;
-    const score = similarityScore(target, input.value);
-    if(score >= 90){
+    const typed = dictWords(input.value);
+    // compare word by word so the learner sees exactly where it broke
+    let firstWrong = -1;
+    const marks = target.map((w,i)=>{
+      const ok = typed[i] !== undefined && dictNorm(typed[i]) === dictNorm(w);
+      if(!ok && firstWrong === -1) firstWrong = i;
+      return ok;
+    });
+    const allOk = marks.every(Boolean) && typed.length === target.length;
+
+    if(allOk){
       slot.dataset.done = "1";
-      slot.innerHTML = `<div class="feedback good">✓ To'g'ri! <b>${target}</b><br><span style="font-size:12.5px;">Endi ovoz chiqarib o'qib ko'ring.</span></div>`;
-      setTimeout(advance, 1100);
+      paintSlots(target.length);
+      slot.innerHTML = `<div class="feedback good">✓ To'g'ri! <b>${sent.text}</b><br><span style="font-size:12.5px;">Endi ovoz chiqarib o'qib ko'ring.</span></div>`;
+      setTimeout(()=> advance(dictRevealed ? "hint" : "ok"), 1200);
     } else {
-      const diff = wordDiff(target, input.value).map(w=>`<span class="word-chip ${w.ok?'ok':'no'}">${w.word}</span>`).join("");
-      slot.innerHTML = `<div class="feedback bad">${score}% mos — yana urinib ko'ring.<br>${diff}</div>`;
+      const correctPrefix = marks.findIndex(m=>!m);
+      paintSlots(correctPrefix === -1 ? target.length : correctPrefix);
+      const diff = target.map((w,i)=>{
+        if(marks[i]) return `<span class="word-chip ok">${w}</span>`;
+        if(typed[i] === undefined) return `<span class="word-chip miss">?</span>`;
+        return `<span class="word-chip no">${typed[i]}</span>`;
+      }).join("");
+      const okCount = marks.filter(Boolean).length;
+      slot.innerHTML = `<div class="feedback bad">${okCount}/${target.length} so'z to'g'ri — yana urinib ko'ring.<br>${diff}</div>`;
     }
   }
+
   document.getElementById("dictCheck").addEventListener("click", check);
-  input.addEventListener("keydown", e=>{ if(e.key === "Enter") check(); });
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter"){ e.preventDefault(); check(); } });
   document.getElementById("dictSkip").addEventListener("click", ()=>{
     slot.dataset.done = "1";
-    slot.innerHTML = `<div class="feedback bad">To'g'ri javob: <b>${sents[idx].text}</b></div>`;
-    setTimeout(advance, 1400);
+    paintSlots(target.length);
+    slot.innerHTML = `<div class="feedback bad">To'g'ri javob: <b>${sent.text}</b></div>`;
+    setTimeout(()=> advance("skip"), 1700);
+  });
+}
+
+/* ---------- results ---------- */
+function renderDictResults(sents){
+  const vals = Object.values(dictResults);
+  const clean = vals.filter(v=>v==="ok").length;
+  const hinted = vals.filter(v=>v==="hint").length;
+  const skipped = vals.filter(v=>v==="skip").length;
+  const pct = Math.round(clean / sents.length * 100);
+  return `
+    <div style="text-align:center; padding:10px 0 4px;">
+      <div style="font-family:var(--font-display); font-size:44px; font-weight:700; line-height:1;">${pct}%</div>
+      <p style="color:var(--ink-soft); margin:10px 0 20px;">
+        ${clean} ta mustaqil · ${hinted} ta yordam bilan · ${skipped} ta ko'rsatilgan
+      </p>
+      <div class="shadow-actions" style="justify-content:center;">
+        <button class="btn btn-primary btn-sm" id="dictRestart">Qaytadan boshlash</button>
+        <button class="btn btn-ghost btn-sm" id="dictShowText">Matnni ko'rish</button>
+      </div>
+    </div>`;
+}
+
+function wireDictResults(el, ep, sents){
+  if(!state.dictationDone.includes(ep.id)){
+    state.dictationDone.push(ep.id); logActivity(10); saveState();
+  }
+  document.getElementById("dictRestart").addEventListener("click", ()=>{
+    dictSentIdx=0; dictRevealed=0; dictPlays=0; dictResults={}; renderDictation();
+  });
+  document.getElementById("dictShowText").addEventListener("click", ()=>{
+    dictTab="transcript"; renderDictation();
   });
 }
 
