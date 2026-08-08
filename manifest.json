@@ -1,0 +1,35 @@
+{
+  "name": "RUSCHA — Rus tilini o'rganish",
+  "short_name": "RUSCHA",
+  "description": "O'zbek tilida so'zlashuvchilar uchun rus tili platformasi: lug'at, diktant, gapirish, A1-C1 matnlar va testlar.",
+  "lang": "uz",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "categories": ["education", "books"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
