@@ -1,11 +1,11 @@
 /* RUSCHA service worker
    Kesh versiyasi: saytni yangilaganingizda VERSION raqamini oshiring. */
-const VERSION = 'ruscha-v1';
+const VERSION = 'ruscha-v2';
 const CORE = [
   './',
   './index.html',
-  './vendor/react.production.min.js',
-  './vendor/react-dom.production.min.js',
+  './lib/react.production.min.js',
+  './lib/react-dom.production.min.js',
   './assets/dc-runtime.js',
   './assets/ruscha-data.js',
   './assets/ruscha-pismo.js',
