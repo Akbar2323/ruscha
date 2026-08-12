@@ -1,6 +1,6 @@
 /* RUSCHA service worker
    Kesh versiyasi: saytni yangilaganingizda VERSION raqamini oshiring. */
-const VERSION = 'ruscha-v2';
+const VERSION = 'ruscha-v3';
 const CORE = [
   './',
   './index.html',
